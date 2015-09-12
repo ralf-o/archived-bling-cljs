@@ -1,51 +1,46 @@
 (ns blingbling.demo.todomvc
-  (:require [blingbling.core :as bling]))
+  (:require [blingbling.core :as bling]
+            [cljs.reader :as reader]))
 
+(def local-storage-key "todomvc.blingbling.state")
 
-(defrecord ^:eport Todo
-  [id text completed?])
-
-(def ^:eport filters
-  {:all (fn [] true)
-   :active (complement :completed?)
+(def filters
+  {:all       (fn [] true)
+   :active    (complement :completed?)
    :completed :completed?})
 
 
-(defn todomvc-controller [event  state]
+(defn todomvc-controller [event state dispatch publish]
   (let [[event-key arg arg2] event
         find-index-by (fn [coll id f] (first (keep-indexed #(if (= id (f %2)) %1) coll))) ;; TODO
         inc-next-id #(update % :next-id inc)]
     ;; (print (str "-----> "  arg " : " (:todos state) "|" (keep-indexed #(if (= arg (:id %2)) %1) (:todos state)) "|")); (find-index-by-id (:todos state) 2)))
-    (case
-      event-key
+    (let [new-state (case event-key
+                      :set-filter (assoc state :active-filter arg)
 
-      :set-filter
-      (assoc  state :active-filter arg)
+                      :clear-completed-todos (update state :todos
+                                                     #(vec (filter (complement :completed?) %)))
 
-      :clear-completed-todos
-      (update  state :todos
-               #(vec (filter (complement :completed?) %)))
+                      :set-todo-completed (assoc-in state
+                                                    [:todos (+ 0 (find-index-by-id (:todos state) arg)) :completed?] arg2) ;; TODO!!!!
 
-      :set-todo-completed
-      (assoc-in  state [:todos (+ 0(find-index-by-id (:todos state) arg)) :completed?] arg2) ;; TODO!!!!
+                      :set-todo-completed-for-all (update state :todos
+                                                          #(mapv
+                                                            (fn [todo]
+                                                              (assoc todo :completed? arg)) %))
 
-      :set-todo-completed-for-all
-      (update  state :todos
-               #(mapv
-                 (fn [todo]
-                   (assoc todo :completed? arg)) %))
+                      :add-todo (inc-next-id (update state :todos
+                                                     #(conj % {:id (:next-id state) :text arg :completed false})))
 
-      :add-todo
-      (inc-next-id (update state :todos
-                           #(conj % (->Todo (:next-id state) arg false))))
+                      :set-todo-text (assoc-in state [:todos arg :text] arg2)
 
-      :set-todo-text
-      (assoc-in  state [:todos arg :text] arg2)
+                      :remove-todo (update state :todos
+                                           #(vec
+                                             (filter (fn [todo] (not= (:id todo) arg)) %))))]
 
-      :remove-todo
-      (update  state :todos
-               #(vec
-                 (filter (fn [todo] (not= (:id todo)  arg)) %))))))
+      (.setItem js/localStorage local-storage-key (str new-state))
+
+      new-state)))
 
 (defn todomvc-view [props state dispatch]
   (let [todos (:todos state)
@@ -57,78 +52,90 @@
     [:section.todoapp
      [:header.header
       [:h1 "todos"]
-      [:input.new-todo {:placeholder "What needs to be done?" :autofocus true :on-key-down #(if (= (.-keyCode %) 13)
-                                                                                             (let [value (.-target.value %)]
-                                                                                               (set! (.-target.value %) "")
-                                                                                               (dispatch [:add-todo value])))}]]
+      [:input.new-todo {:placeholder "What needs to be done?"
+                        :autofocus   true
+                        :on-key-down #(if (= (.-keyCode %) 13)
+                                       (let [value (.-target.value %)]
+                                         (set! (.-target.value %) "")
+                                         (dispatch [:add-todo value])))}]]
+
      [:section.main
-      [:input.toggle-all {:type "checkbox" :checked (zero? active-todo-count) :on-change #(dispatch [:set-todo-completed-for-all (.-target.checked %)])}]
-      [:label {:for "toggle-all"} "Mark all as complete" ]
-      [:ul.todo-list
-       (map-indexed
-         (fn [index todo] ^{:key index} [todomvc-item {:todo todo :emit dispatch}])
-         visible-todos)]]
+      [:input.toggle-all {:type      "checkbox"
+                          :checked   (zero? active-todo-count)
+                          :on-change #(dispatch [:set-todo-completed-for-all (.-target.checked %)])}]
+
+      [:label {:for "toggle-all"}
+       "Mark all as complete"]
+      [:ul.todo-list (map-indexed
+                       (fn [index todo] ^{:key (:id todo)} [todomvc-item {:todo todo :=> dispatch}])
+                       visible-todos)]]
+
      [:footer.footer
       [:span.todo-count
-       [:strong active-todo-count] " item left"]
-      [:ul.filters
-       [:li
-        [(if (= active-filter :all) :a.selected :a) {:on-click #(dispatch [:set-filter :all]) :href "#"} "All"]
-        [(if (= active-filter :active) :a.selected :a) {:on-click #(dispatch [:set-filter :active]) :href "#"} "Active"]
-        [(if (= active-filter :completed) :a.selected :a) {:on-click #(dispatch [:set-filter :completed]) :href "#"} "Completed"]]]
+       [:strong active-todo-count] " item left"]            ;; TODO (item vs items)
+      [:ul.filters>li
+       [(if (= active-filter :all) :a.selected :a) {:on-click #(dispatch [:set-filter :all])
+                                                    :href     "#"} "All"]
+
+       [(if (= active-filter :active) :a.selected :a) {:on-click #(dispatch [:set-filter :active])
+                                                       :href     "#"} "Active"]
+
+       [(if (= active-filter :completed) :a.selected :a) {:on-click #(dispatch [:set-filter :completed])
+                                                          :href     "#"} "Completed"]]
+
       (if (< active-todo-count total-todo-count)
         [:button.clear-completed {:on-click #(dispatch [:clear-completed-todos])} "Clear completed"])
+
       [:footer.info
        [:p " Double-click to edit a todo"]
        [:p " Created by " [:a {:href "http://www.google.com"} "Ralf"]]
        [:p " Part of " [:a {:href "http://todomvc.com"} "TodoMVC"]]]]]))
 
+(defn- todomvc-initial-state-provider [] (print 4444)
+  (let [state (.getItem js/localStorage local-storage-key)]
+    (if (nil? state)
+      {:todos [], :active-filter :all, :next-id 0}
+      (reader/read-string state))))
 
-(def todomvc (bling/create-component-class todomvc-view todomvc-controller {:todos [(->Todo 0 "Todo 1", false), (->Todo 1 "Todo 2", true),(->Todo 2 "Todo 3", false)] :active-filter :all :next-id 3}))
+
+(def todomvc (bling/create-component-class todomvc-view todomvc-controller todomvc-initial-state-provider nil))
 
 ;; --------------------------------------
 
 (defn todomvc-item-view [props state dispatch]
   (let [todo (:todo props)
         id (:id todo)
-        emit (:emit props)
         class (str (if (:completed? todo) "completed" "active") (if (:in-edit-mode? state) "-editing editing"))
         toggle-edit-mode #(dispatch [:toggle-edit-mode])
-        update-todo-text #(emit [:update-todo-text id (.-target.value %)])]
+        set-todo-text #(dispatch [:set-todo-text id (.-target.value %)])]
 
     [:li {:key id :class class}
      [:div.view
-      [:input.toggle {:type "checkbox" :checked (:completed? todo) :on-change #(emit [:set-todo-completed id (.-checked (.-target %))])}]
-      [:label {:on-double-click toggle-edit-mode} (:text todo)]
-      [:button.destroy {:on-click #(emit [:remove-todo id])}]]
-     [:input.edit {:type "text"
-                   :value (:text todo)
-                   :on-change update-todo-text
-                   :on-key-down #(if (= (.-keyCode %) 13) (toggle-edit-mode))
-                   :on-blur toggle-edit-mode}]]))
+      [:input.toggle {:type      "checkbox"
+                      :checked   (:completed? todo)
+                      :on-change #(dispatch [:set-todo-completed id (.-checked (.-target %))])}]
 
-(defn todomvc-item-controller [event state dispatch]
+      [:label {:on-double-click toggle-edit-mode} (:text todo)]
+      [:button.destroy {:on-click #(dispatch [:remove-todo id])}]]
+     [:input.edit {:type        "text"
+                   :value       (:text todo)
+                   :on-change   set-todo-text
+                   :on-key-down #(if (= (.-keyCode %) 13) (toggle-edit-mode))
+                   :on-blur     toggle-edit-mode}]]))
+
+(defn todomvc-item-controller [event state dispatch publish]
   (let [[event-key arg] event]
     (case event-key
-      :toggle-edit-mode
-      (update state :in-edit-mode? #(not %))
+      :toggle-edit-mode (update state :in-edit-mode? #(not %))
 
-      :update-todo-text
-      (dispatch [:set-todo-text id arg]))))
+      ;; publish all other events to parent component
+      (publish event))))
 
-(def todomvc-item (bling/create-component-class todomvc-item-view todomvc-item-controller {:in-edit-mode? false}))
+(def todomvc-item (bling/create-component-class todomvc-item-view todomvc-item-controller {:in-edit-mode? false} nil))
 
 ;; --------------------------------------
 
 (enable-console-print!)
 
-(def initial-state
-  {:todos
-                  [(->Todo 0 "Todo 1" false)
-                   (->Todo 1 "Todo 2" true)
-                   (->Todo 2 "Todo 3" false)]
-   :active-filter :active
-   :next-id 3})
-
-(defn ^:export start []
-  (bling/mount-component [:div [todomvc :state initial-state][todomvc :state initial-state][todomvc :state initial-state][todomvc :state initial-state][todomvc :state initial-state][todomvc :state initial-state][todomvc :state initial-state][todomvc :state initial-state][todomvc :state initial-state][todomvc :state initial-state][todomvc :state initial-state][todomvc :state initial-state][todomvc :state initial-state][todomvc :state initial-state][todomvc :state initial-state][todomvc :state initial-state][todomvc :state initial-state][todomvc :state initial-state][todomvc :state initial-state][todomvc :state initial-state][todomvc :state initial-state][todomvc :state initial-state][todomvc :state initial-state][todomvc :state initial-state][todomvc :state initial-state][todomvc :state initial-state][todomvc :state initial-state][todomvc :state initial-state] [todomvc :state initial-state]] "root"))
+(defn start []
+  (bling/mount-component [todomvc {:!!! "TODO: Remove debug information when done"}] "root"))
