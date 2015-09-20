@@ -1,5 +1,5 @@
-(ns blingbling.demo.todomvc
-  (:require [blingbling.core :as bling]
+(ns bling.demo.todomvc
+  (:require [bling.core :as bling]
             [cljs.reader :as reader]))
 
 (comment
@@ -25,7 +25,7 @@
 ;; Just to active bling-bling's "debug mode"
 ;; (set! bling/debug-all true)
 
-(def local-storage-key "todomvc.blingbling.state")
+(def local-storage-key "todomvc.bling.state")
 
 (def filters
   {:all       (fn [] true)
@@ -37,8 +37,7 @@
   (let [[event-key arg arg2] event
         find-index-by (fn [coll id f] (first (keep-indexed #(if (= id (f %2)) %1) coll))) ;; TODO
         inc-next-id #(update % :next-id inc)]
-    ;; (print (str "-----> "  arg " : " (:todos state) "|" (keep-indexed #(if (= arg (:id %2)) %1) (:todos state)) "|")); (find-index-by-id (:todos state) 2)))
-       (print event)
+    ;; (print (str "-----> "  arg " : " (:todos state) "|" (keep-indexed #(if (= arg (:id %2)) %1) (:todos state)) "|")); (find-index-by-id (:todos state) 2))
     (let [new-state (case event-key
                       :set-filter (assoc state :active-filter arg)
 

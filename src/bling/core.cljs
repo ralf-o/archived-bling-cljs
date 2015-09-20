@@ -1,4 +1,4 @@
-(ns blingbling.core
+(ns bling.core
   (:require [reagent.core :as r]))
 
 #_(comment

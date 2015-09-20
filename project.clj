@@ -1,4 +1,4 @@
-(defproject bling-bling "0.1.0-SNAPSHOT"
+(defproject bling-cljs "0.1.0-SNAPSHOT"
   :description "A tiny UI library based on react.js and reagant"
   :url "https://github.com/ralf-o/bling-bling"
 
@@ -11,8 +11,8 @@
 
   :plugins [[lein-cljsbuild "1.1.0"]]
   :cljsbuild {:builds [{:source-paths ["src", "demo"]
-                        :compiler     {:output-to     "target/todomvc-blingbling.js"
-                                       :source-map    "target/todomvc-blingbling.js.map"
+                        :compiler     {:output-to     "target/todomvc-bling.js"
+                                       :source-map    "target/todomvc-bling.js.map"
                                        :elide-asserts false
                                        :optimizations :whitespace
                                        :pretty-print  true}}]})
