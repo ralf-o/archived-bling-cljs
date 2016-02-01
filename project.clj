@@ -7,12 +7,13 @@
 
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [org.clojure/clojurescript "1.7.122"]
+                 [org.clojure/core.match "0.3.0-alpha4"]
                  [reagent "0.6.0-alpha"]]
 
   :plugins [[lein-cljsbuild "1.1.2"]]
   :cljsbuild {:builds [{:source-paths ["src", "demo"]
                         :compiler     {:output-to     "target/todomvc-bling.js"
-                                       ;;:source-map    "target/todomvc-bling.js.map"
+                                       source-map   true
                                        :elide-asserts false
                                        :optimizations :whitespace
                                        :pretty-print  true}}]})
