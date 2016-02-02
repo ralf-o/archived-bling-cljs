@@ -59,7 +59,7 @@
 
       new-state)))
 
-(defn todomvc-view [props state dispatch]
+(defn todomvc-main-view [props state dispatch]
   (let [todos (:todos state)
         active-filter (:active-filter state)
         visible-todos (filter (active-filter filters) todos)
@@ -129,11 +129,12 @@
        (reader/read-string state)))))
 
 
-(def todomvc
+(def todomvc-main
   (bling/create-component-class
-    todomvc-view
-    todomvc-controller
-    {:todos [] :active-filter :all :next-id 0} nil))
+    :type-name "todomvc-main"
+    :view todomvc-main-view
+    :controller todomvc-controller
+    :initial-state {:todos [] :active-filter :all :next-id 0} nil))
 
 ;; --------------------------------------
 
@@ -170,11 +171,16 @@
       [state event])))
 
 
-(def todomvc-item (bling/create-component-class todomvc-item-view todomvc-item-controller {:in-edit-mode? false} nil))
+(def todomvc-item
+  (bling/create-component-class
+    :type-name "todomvc-item"
+    :view todomvc-item-view
+    :controller todomvc-item-controller
+    :initial-state {:in-edit-mode? false} nil))
 
 ;; --------------------------------------
 
 (enable-console-print!)
 
 (defn start []
-  (bling/mount-component [todomvc {:!!! "TODO: Remove debug information when done"}] "root"))
+  (bling/mount-component [todomvc-main {:!!! "TODO: Remove debug information when done"}] "root"))
