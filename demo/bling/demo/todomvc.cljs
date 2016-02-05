@@ -59,13 +59,56 @@
 
       new-state)))
 
-(defn todomvc-main-view [props state dispatch]
+;; --- component: todomvc-app -----------------------------------
+
+(defn todomvc-app-view [props state send]
+  [todomvc-header :on-new-todo (send! :parent :add-todo value)]
+  [todomvc-main :on-remove]
+  [todomvc-footer])
+
+(defn- todomvc-initial-state-provider
+  []
+  ((let [state (.getItem js/localStorage local-storage-key)]
+     (if (nil? state)
+       {:todos [], :active-filter :all, :next-id 0}
+       (reader/read-string state)))))
+
+(def todomvc-app
+  (bling/create-component-class
+    :type-name "todomvc-main"
+    :view todomvc-main-view
+    :controller todomvc-controller
+    :initial-state {:todos [] :active-filter :all :next-id 0} nil))
+
+;; --- component: todomvc-header --------------------------------
+
+(defn todomvc-header-view [props state send]
+  [:section.todoapp #_(print visible-todos)
+   [:header.header
+    [:h1 "todos"]
+    [:input.new-todo
+     {:placeholder "What needs to be done?"
+      :autofocus   true
+      :on-key-down #(if (= (.-keyCode %) 13)
+                     (let [value (.-target.value %)]
+                       (set! (.-target.value %) "")
+                       (send! :parent :on-new-todo value)))}]]])
+
+(def todomvc-header
+  (bling/create-component-class
+    :type-name "todomvc-header"
+    :view todomvc-header-view))
+
+;; --- component: todomvc-items --------------------------------
+
+(defn todomvc-items-view [props state dispatch]
   (let [todos (:todos state)
         active-filter (:active-filter state)
         visible-todos (filter (active-filter filters) todos)
         total-todo-count (count todos)
         active-todo-count (->> todos (filter (complement :completed)) count)]
 
+    [todomvc-header :on-new-todo #(dispatch [:add-todo %])]
     [:section.todoapp #_(print visible-todos)
      [:header.header
       [:h1 "todos"]
@@ -92,6 +135,8 @@
            [todomvc-item {:todo todo :=> dispatch}])
          visible-todos)]]
 
+
+     ;; --- component: todomvc-footer --------------------------------
      [:footer.footer
       [:span.todo-count
        [:strong active-todo-count] " item left"]            ;; TODO (item vs items)
@@ -121,20 +166,8 @@
        [:p " Created by " [:a {:href "http://www.google.com"} "Ralf"]]
        [:p " Part of " [:a {:href "http://todomvc.com"} "TodoMVC"]]]]]))
 
-(defn- todomvc-initial-state-provider
-  []
-  ((let [state (.getItem js/localStorage local-storage-key)]
-     (if (nil? state)
-       {:todos [], :active-filter :all, :next-id 0}
-       (reader/read-string state)))))
 
 
-(def todomvc-main
-  (bling/create-component-class
-    :type-name "todomvc-main"
-    :view todomvc-main-view
-    :controller todomvc-controller
-    :initial-state {:todos [] :active-filter :all :next-id 0} nil))
 
 ;; --------------------------------------
 
@@ -143,7 +176,7 @@
         id (:id todo)
         class (str (if (:completed todo) "completed" "active") (if (:in-edit-mode? state) "-editing editing"))
         toggle-edit-mode #(dispatch [:toggle-edit-mode])
-        set-todo-text #(dispatch [:set-todo-text id (.-target.value %)])]
+        set-todo-text #(dispatch [:set-todo-text id (.-target.value %)]) ik]
 
     [:li {:key id :class class}
      [:div.view
