@@ -80,10 +80,9 @@
     :controller todomvc-controller
     :initial-state {:todos [] :active-filter :all :next-id 0} nil))
 
-;; --- component: todomvc-header --------------------------------
 
-(defn todomvc-header-view [props state send]
-  [:section.todoapp #_(print visible-todos)
+(defn todomvc-header-view [props publish state dispatch]
+  [:section.todoapp
    [:header.header
     [:h1 "todos"]
     [:input.new-todo
@@ -94,10 +93,150 @@
                        (set! (.-target.value %) "")
                        (send! :parent :on-new-todo value)))}]]])
 
+
+
+
+
+
+
+
+
+;; --- component: todomvc-app --------------------------------
+(def todomvc-app
+  (bling/create-component-class
+    {:name
+     "todomvc-all"
+
+     :initial-state
+     :state-transitions
+
+     {:set-filter
+      (fn [state filter]
+        (assoc state :active-filter filter))
+
+
+      :set-filter
+      (fn [filter]
+        (fn [state]
+          (assoc state :active-filter filter)))
+
+
+      :clear-completed-todos
+      (fn [state]
+        (assoc state :todos
+                     #(vec
+                       (filter (complement :completed) %))))
+
+      :set-todo-completed
+      (fn [state id completed]
+                   (assoc-in state
+                             [:todos (+ 0 (find-index-by-id (:todos state) arg)) :completed] completed) ;; TODO!!!!
+
+                   [:set-todo-completed-for-all completed]
+                   (update state :todos
+                           #(mapv
+                             (fn [todo]
+                               (assoc todo :completed completed)) %))
+
+                   [:add-todo text]
+                   (inc-next-id (update state :todos
+                                        #(conj % {:id (:next-id state) :text text :completed false})))
+
+                   [:set-todo-text todo-id text]
+                   (assoc-in state [:todos todo-id :text] text)
+
+                   [:remove-todo todo-id]
+                   (update state :todos
+                           #(vec
+                             (filter
+                               (fn [todo]
+                                 (not= (:id todo) todo-id)) %))))]
+
+        (.setItem js/localStorage local-storage-key (str new-state)))))
+
+
+;; --- component: todomvc-header --------------------------------
 (def todomvc-header
   (bling/create-component-class
-    :type-name "todomvc-header"
-    :view todomvc-header-view))
+    {:name
+     "todomvc-header"
+
+     :default-props
+     {:on-entered-todo nil}
+
+     :initial-state
+     {:text ""}
+
+     :state-transitions
+     {:set-text
+      (fn [state text] (assoc state :text text))
+
+      :clear-text
+      (fn [state] assoc state :text "")}
+
+     :view
+     (fn [props publish! state dispatch!]
+       [:div
+        [:header.header
+         [:h1 "todos"]
+         [:input.new-todo
+          {:placeholder "What needs to be done?"
+           :value       (:text state)
+           :autofocus   true
+           :on-key-down #(if (= (.-keyCode %) 13)
+                          (do (publish! :on-entered-todo (:text state))
+                              (dispatch :clear-text))
+                          (dispatch! :set-text (.-target.value)))
+           :on-blur     (do (publish! :on-entered-todo (:text state))
+                            (dispatch! :clear-text))}]]])}))
+
+
+;; --- component: todomvc-items --------------------------------
+;; --- component: todomvc-footer --------------------------------
+(def todomvc-footer
+  (bling/create-component-class
+    {:name
+     "todomvc-footer"
+
+     :default-props
+     {:active-filter    :all
+      :on-filter-change nil}
+
+     :view
+     (fn [prop publish! _ _]
+       [:footer.footer
+        [:span.todo-count
+         [:strong active-todo-count] " items left"]         ;; TODO (item vs items)
+        [:ul.filters>li
+         [(if (= active-filter :all) :a.selected :a)
+          {:on-click #(publish! :on-filter-change :all)
+           :href     "#"}
+          "All"]
+
+         [(if (= active-filter :active)
+            :a.selected :a)
+          {:on-click #(publish! :on-filter-change :active)
+           :href     "#"} "Active"]
+
+         [(if (= active-filter :completed)
+            :a.selected :a)
+          {:on-click #(publish! :on-filter-change :completed)
+           :href     "#"} "Completed"]]])}))
+
+
+
+(if (< active-todo-count total-todo-count)
+  [:button.clear-completed
+   {:on-click #(dispatch [:clear-completed-todos])}
+   "Clear completed"])
+
+[:footer.info
+ [:p " Double-click to edit a todo"]
+ [:p " Created by " [:a {:href "http://www.google.com"} "Ralf"]]
+ [:p " Part of " [:a {:href "http://todomvc.com"} "TodoMVC"]]] ] ] ) )
+
+
+
 
 ;; --- component: todomvc-items --------------------------------
 
